@@ -4,11 +4,6 @@ LOG_DIR="${PROJECT_DIR}/logs"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 LOG_FILE="${LOG_DIR}/run_${TIMESTAMP}.log"
 
-echo $PROJECT_DIR
-echo $LOG_DIR
-echo $TIMESTAMP
-echo $LOG_FILE
-
 # Create log directory if it doesn't exist
 mkdir -p "${LOG_DIR}"
 
