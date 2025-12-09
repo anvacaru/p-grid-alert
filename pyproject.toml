@@ -1,0 +1,65 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "p-grid-alert"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "beautifulsoup4>=4.14.3",
+    "pypdf2>=3.0.1",
+    "python-dotenv>=1.2.1",
+    "requests>=2.32.5",
+]
+
+[project.scripts]
+p-grid-alert = "p_grid_alert.__main__:main"
+
+[tool.uv]
+package = true
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[dependency-groups]
+dev = [
+    "autoflake",
+    "black",
+    "flake8",
+    "flake8-bugbear",
+    "flake8-comprehensions",
+    "flake8-quotes",
+    "flake8-type-checking",
+    "isort",
+    "mypy",
+    "pep8-naming",
+    "pyupgrade",
+    "types-requests",
+    "pytest>=7,<8",
+    "pytest-xdist>=3.8.0",
+    "pytest-cov>=7.0.0",
+]
+
+[tool.isort]
+profile = "black"
+line_length = 120
+
+[tool.autoflake]
+recursive = true
+expand-star-imports = true
+remove-all-unused-imports = true
+ignore-init-module-imports = true
+remove-duplicate-keys = true
+remove-unused-variables = true
+
+[tool.black]
+line-length = 100
+skip-string-normalization = true
+
+[tool.mypy]
+strict = true
+explicit_package_bases = true
+mypy_path = "src"
