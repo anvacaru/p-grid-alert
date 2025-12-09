@@ -5,9 +5,9 @@ from argparse import ArgumentParser
 
 from dotenv import load_dotenv
 
-from .pdf_reader import extract_text, fetch_pdf_urls
-from .smtp_driver import send_alert
-from .utils import LOG_FORMAT, STREET
+from .event_processor import process_url
+from .pdf_reader import fetch_pdf_urls
+from .utils import LOG_FORMAT
 
 load_dotenv()
 _LOGGER = logging.getLogger(__name__)
@@ -17,20 +17,6 @@ def _argument_parser() -> ArgumentParser:
     parser = ArgumentParser(description='Power grid outage alert')
     parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose logging')
     return parser
-
-
-def process(pdf_urls: list[str]) -> None:
-    for url in pdf_urls:
-        pdf_id = url.split('?')[0].split('/')[-1]
-
-        _LOGGER.info(f'Processing: {pdf_id} file.')
-        text = extract_text(url)
-
-        if STREET.lower() in text.lower():
-            idx = text.lower().find(STREET.lower())
-            excerpt = '...' + text[max(0, idx - 200) : idx + 200] + '...'
-            _LOGGER.warning(excerpt)
-            send_alert(STREET, url, excerpt)
 
 
 def main() -> None:
@@ -49,7 +35,8 @@ def main() -> None:
         _LOGGER.warning('No PDFs found for current/next week')
         return
 
-    process(pdf_urls)
+    for url in pdf_urls:
+        process_url(url)
     _LOGGER.info('Check complete')
 
 

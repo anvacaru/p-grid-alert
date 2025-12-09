@@ -9,7 +9,7 @@ from .utils import EMAIL_CONFIG
 _LOGGER = logging.getLogger(__name__)
 
 
-def send_alert(street: str, pdf_url: str, excerpt: str) -> None:
+def send_alert(street: str, pdf_url: str, excerpt: str, day: str, time: str) -> None:
     """Send email alert for power outage."""
     try:
         recipients = [r.strip() for r in EMAIL_CONFIG['email_to'].split(',') if r.strip()]
@@ -18,8 +18,10 @@ def send_alert(street: str, pdf_url: str, excerpt: str) -> None:
             _LOGGER.warning('No email recipients configured')
             return
 
-        msg = MIMEText(f'Outage scheduled for {street}\n\nPDF: {pdf_url}\n\n{excerpt}')
-        msg['Subject'] = f'Power Outage Alert: {street}'
+        body = message_body(street, pdf_url, excerpt, day, time)
+
+        msg = MIMEText(body)
+        msg['Subject'] = f'Alerta Intrerupere de Curent: {street} - {day} {time}'
         msg['From'] = EMAIL_CONFIG['smtp_user']
         msg['To'] = ', '.join(recipients)
 
@@ -31,3 +33,16 @@ def send_alert(street: str, pdf_url: str, excerpt: str) -> None:
         _LOGGER.info(f'✓ Alert sent to {len(recipients)} recipient(s)')
     except Exception as e:
         _LOGGER.error(f'Failed to send email: {e}')
+
+
+def message_body(street: str, pdf_url: str, excerpt: str, day: str, time: str) -> str:
+    return f"""Intrerupere de curent programata pentru strada {street}.
+
+Ziua: {day}
+Perioada: {time}
+
+Document PDF: {pdf_url}
+
+Context:
+{excerpt}
+"""

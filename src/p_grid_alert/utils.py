@@ -22,6 +22,10 @@ def _get_required_env(key: str) -> str:
 DEFAULT_HEADERS: Final[dict[str, str]] = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
 }
+RE_DATE_PATTERN: Final[str] = (
+    r'(Luni|Marți|Miercuri|Joi|Vineri|Sâmbătă|Duminică),?\s*(\d{2}\.\d{2}\.\d{4})'
+)
+RE_TIME_PATTERN: Final[str] = r'(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})'
 TARGET_DOMAIN: Final[str] = _get_required_env('P_GRID_TARGET_DOMAIN')
 TARGET_URL: Final[str] = _get_required_env('P_GRID_TARGET_URL')
 STREET: Final[str] = _get_required_env('P_GRID_STREET')

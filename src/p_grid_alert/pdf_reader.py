@@ -3,11 +3,11 @@ from __future__ import annotations
 import logging
 from io import BytesIO
 
-import PyPDF2
+import pypdf
 import requests
 from bs4 import BeautifulSoup
 
-from .date_encoding import encode, get_date_range_for_week
+from .datetime_helpers import encode, get_date_range_for_week
 from .utils import DEFAULT_HEADERS, TARGET_DOMAIN, TARGET_URL
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,5 +37,5 @@ def fetch_pdf_urls() -> list[str]:
 def extract_text(pdf_url: str) -> str:
     """Fetch a PDF file from an URL and convert it to type 'str'."""
     resp = requests.get(pdf_url)
-    reader = PyPDF2.PdfReader(BytesIO(resp.content))
+    reader = pypdf.PdfReader(BytesIO(resp.content))
     return '\n'.join(page.extract_text() for page in reader.pages)

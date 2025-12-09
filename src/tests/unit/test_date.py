@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
-from p_grid_alert.date_encoding import encode, get_date_range_for_week
+from p_grid_alert.datetime_helpers import encode, get_date_range_for_week, parse_event_date
 
 if TYPE_CHECKING:
     from typing import Final
@@ -13,12 +13,6 @@ import pytest
 
 ENCODING_TEST_DATA: Final = [
     ('encode-01', (datetime(2025, 12, 9), datetime(2025, 12, 16)), '09.12.2025%20-%2016.12.2025')
-]
-DATE_RANGE_TEST_DATA: Final = [
-    ('tuesday-current', datetime(2025, 12, 9), 0, datetime(2025, 12, 8), datetime(2025, 12, 14)),
-    ('tuesday-next', datetime(2025, 12, 9), 1, datetime(2025, 12, 15), datetime(2025, 12, 21)),
-    ('monday-current', datetime(2025, 12, 8), 0, datetime(2025, 12, 8), datetime(2025, 12, 14)),
-    ('sunday-current', datetime(2025, 12, 14), 0, datetime(2025, 12, 8), datetime(2025, 12, 14)),
 ]
 
 
@@ -36,6 +30,14 @@ def test_datetime_encoding(
     assert actual == expected
 
 
+DATE_RANGE_TEST_DATA: Final = [
+    ('tuesday-current', datetime(2025, 12, 9), 0, datetime(2025, 12, 8), datetime(2025, 12, 14)),
+    ('tuesday-next', datetime(2025, 12, 9), 1, datetime(2025, 12, 15), datetime(2025, 12, 21)),
+    ('monday-current', datetime(2025, 12, 8), 0, datetime(2025, 12, 8), datetime(2025, 12, 14)),
+    ('sunday-current', datetime(2025, 12, 14), 0, datetime(2025, 12, 8), datetime(2025, 12, 14)),
+]
+
+
 @pytest.mark.parametrize(
     'test_id,mock_now,weeks_ahead,expected_start,expected_end',
     DATE_RANGE_TEST_DATA,
@@ -49,7 +51,7 @@ def test_get_date_range_for_week(
     expected_end: datetime,
 ) -> None:
     # Given
-    with patch('p_grid_alert.date_encoding.datetime') as mock_dt:
+    with patch('p_grid_alert.datetime_helpers.datetime') as mock_dt:
         mock_dt.now.return_value = mock_now
         mock_dt.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
 
@@ -59,3 +61,26 @@ def test_get_date_range_for_week(
         # Then
         assert actual_start == expected_start
         assert actual_end == expected_end
+
+
+PARSE_DATE_TEST_DATA: Final = [
+    ('with-day-name', 'Marți, 09.12.2025', datetime(2025, 12, 9)),
+    ('without-day-name', '09.12.2025', datetime(2025, 12, 9)),
+    ('with-extra-text', 'pana de. Joi, 15.01.2026 pentru mentenanta', datetime(2026, 1, 15)),
+    ('invalid-format', 'Decembrie 9, 2025', None),
+    ('invalid-date', '32.13.2025', None),
+    ('empty-string', '', None),
+    ('only-day-name', 'Marți', None),
+]
+
+
+@pytest.mark.parametrize(
+    'test_id,day_str,expected',
+    PARSE_DATE_TEST_DATA,
+    ids=[test_id for test_id, *_ in PARSE_DATE_TEST_DATA],
+)
+def test_parse_outage_date(test_id: str, day_str: str, expected: datetime | None) -> None:
+    # When
+    actual = parse_event_date(day_str)
+    # Then
+    assert actual == expected
