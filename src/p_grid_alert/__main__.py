@@ -13,7 +13,7 @@ from .utils import DEFAULT_HEADERS, LOG_FORMAT, STREET, TARGET_DOMAIN, TARGET_UR
 
 load_dotenv()
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format=LOG_FORMAT,
     datefmt='%Y-%m-%d %H:%M:%S',
 )
@@ -63,8 +63,8 @@ def main() -> None:
             idx = text.lower().find(STREET.lower())
             excerpt = '...' + text[max(0, idx - 200) : idx + 200] + '...'
             _LOGGER.warning(excerpt)
-        else:
-            print(f'✗ No outage for {STREET}')
+
+    _LOGGER.info('Check complete')
 
 
 if __name__ == '__main__':
