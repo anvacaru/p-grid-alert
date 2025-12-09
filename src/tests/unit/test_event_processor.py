@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
-from p_grid_alert.event_processor import extract_event_details, is_event_in_future
+from p_grid_alert.event_processor import extract_all_events, is_event_in_future
 
 if TYPE_CHECKING:
     from typing import Final
@@ -20,29 +20,40 @@ IS_EVENT_IN_FUTURE_TEST_DATA: Final = [
     ('invalid-date', 'Invalid date', '09:00 - 17:00', datetime(2025, 12, 10, 12, 0), True),
 ]
 
-EXTRACT_EVENT_DETAILS_TEST_DATA: Final = [
+EXTRACT_ALL_EVENTS_TEST_DATA: Final = [
     (
-        'valid-event',
+        'single-event',
         'Some text Marți, 09.12.2025 București, Sector 1 Strada Principala 09:00 - 17:00 more text',
         'Principala',
+        1,
         {'day': 'Marți, 09.12.2025', 'time': '09:00 - 17:00'},
+    ),
+    (
+        'multiple-events',
+        'Marți, 09.12.2025 Strada Principala 09:00 - 12:00 and Miercuri, 10.12.2025 Strada Principala 14:00 - 18:00',
+        'Principala',
+        2,
+        None,
     ),
     (
         'street-not-found',
         'Some text Marți, 09.12.2025 București, Sector 1 Strada Altceva 09:00 - 17:00',
         'Principala',
+        0,
         None,
     ),
     (
         'no-time',
         'Some text Marți, 09.12.2025 București, Sector 1 Strada Principala more text',
         'Principala',
+        1,
         {'day': 'Marți, 09.12.2025', 'time': 'Unknown'},
     ),
     (
         'no-date',
         'Some text București, Sector 1 Strada Principala 09:00 - 17:00 more text',
         'Principala',
+        1,
         {'day': 'Unknown', 'time': '09:00 - 17:00'},
     ),
 ]
@@ -69,21 +80,24 @@ def test_is_event_in_future(
 
 
 @pytest.mark.parametrize(
-    'test_id,text,street,expected',
-    EXTRACT_EVENT_DETAILS_TEST_DATA,
-    ids=[test_id for test_id, *_ in EXTRACT_EVENT_DETAILS_TEST_DATA],
+    'test_id,text,street,expected_count,expected_first',
+    EXTRACT_ALL_EVENTS_TEST_DATA,
+    ids=[test_id for test_id, *_ in EXTRACT_ALL_EVENTS_TEST_DATA],
 )
-def test_extract_event_details(
-    test_id: str, text: str, street: str, expected: dict[str, str] | None
+def test_extract_all_events(
+    test_id: str,
+    text: str,
+    street: str,
+    expected_count: int,
+    expected_first: dict[str, str] | None,
 ) -> None:
     # When
-    actual = extract_event_details(text, street)
+    actual = extract_all_events(text, street)
 
     # Then
-    if expected is None:
-        assert actual is None
-    else:
-        assert actual is not None
-        assert actual['day'] == expected['day']
-        assert actual['time'] == expected['time']
-        assert 'excerpt' in actual
+    assert len(actual) == expected_count
+
+    if expected_count > 0 and expected_first:
+        assert actual[0]['day'] == expected_first['day']
+        assert actual[0]['time'] == expected_first['time']
+        assert 'excerpt' in actual[0]

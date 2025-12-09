@@ -31,28 +31,37 @@ def is_event_in_future(day_str: str, time_str: str) -> bool:
     return outage_end > now
 
 
-def extract_event_details(text: str, street: str) -> dict[str, str] | None:
-    """Extract day and time from the body of the identified event."""
-    idx = text.lower().find(street.lower())
-    if idx == -1:
-        return None
+def extract_all_events(text: str, street: str) -> list[dict[str, str]]:
+    """Extract all occurrences of street with day and time."""
+    events = []
+    text_lower = text.lower()
+    street_lower = street.lower()
 
-    # Get surrounding context
-    start = max(0, idx - 300)
-    end = min(len(text), idx + 300)
-    context = text[start:end]
+    idx = 0
+    while True:
+        idx = text_lower.find(street_lower, idx)
+        if idx == -1:
+            break
 
-    # Extract day (e.g., "Marți, 09.12.2025")
-    day_match = re.search(RE_DATE_PATTERN, context)
+        # Get surrounding context
+        start = max(0, idx - 300)
+        end = min(len(text), idx + 300)
+        context = text[start:end]
 
-    # Extract time (e.g., "09:00 - 17:00")
-    time_match = re.search(RE_TIME_PATTERN, context)
+        # Extract day and time
+        day_match = re.search(RE_DATE_PATTERN, context)
+        time_match = re.search(RE_TIME_PATTERN, context)
 
-    return {
-        'day': day_match.group(0) if day_match else 'Unknown',
-        'time': f'{time_match.group(1)} - {time_match.group(2)}' if time_match else 'Unknown',
-        'excerpt': '...' + text[max(0, idx - 200) : idx + 200] + '...',
-    }
+        event = {
+            'day': day_match.group(0) if day_match else 'Unknown',
+            'time': f'{time_match.group(1)} - {time_match.group(2)}' if time_match else 'Unknown',
+            'excerpt': '...' + text[max(0, idx - 200) : idx + 200] + '...',
+        }
+
+        events.append(event)
+        idx += len(street)
+
+    return events
 
 
 def process_url(url: str) -> None:
@@ -61,12 +70,24 @@ def process_url(url: str) -> None:
     _LOGGER.info(f'Processing: {pdf_id} file.')
     text = extract_text(url)
 
-    details = extract_event_details(text, STREET)
-    if details:
-        if is_event_in_future(details['day'], details['time']):
-            _LOGGER.warning(f'⚠️  OUTAGE FOUND for {STREET}')
-            _LOGGER.warning(f'Day: {details["day"]}')
-            _LOGGER.warning(f'Time: {details["time"]}')
-            send_alert(STREET, url, details['excerpt'], details['day'], details['time'])
-        else:
-            _LOGGER.info(f'Skipping past outage for {STREET} on {details["day"]}')
+    all_events = extract_all_events(text, STREET)
+
+    if not all_events:
+        _LOGGER.info(f'✓ No outages for {STREET}')
+        return
+
+    # Filter future events
+    future_events = [
+        event for event in all_events if is_event_in_future(event['day'], event['time'])
+    ]
+
+    if not future_events:
+        _LOGGER.info(f'Skipping {len(all_events)} past outage(s) for {STREET}')
+        return
+
+    _LOGGER.warning(f'⚠️  Found {len(future_events)} outage(s) for {STREET}')
+    for event in future_events:
+        _LOGGER.warning(f'  - {event["day"]} at {event["time"]}')
+
+    # Send single email with all events
+    send_alert(STREET, url, future_events)
