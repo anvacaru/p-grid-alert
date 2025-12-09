@@ -6,6 +6,7 @@ from argparse import ArgumentParser
 from dotenv import load_dotenv
 
 from .pdf_reader import extract_text, fetch_pdf_urls
+from .smtp_driver import send_alert
 from .utils import LOG_FORMAT, STREET
 
 load_dotenv()
@@ -29,6 +30,7 @@ def process(pdf_urls: list[str]) -> None:
             idx = text.lower().find(STREET.lower())
             excerpt = '...' + text[max(0, idx - 200) : idx + 200] + '...'
             _LOGGER.warning(excerpt)
+            send_alert(STREET, url, excerpt)
 
 
 def main() -> None:
