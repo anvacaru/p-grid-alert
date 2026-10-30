@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import logging
+import sys
 from argparse import ArgumentParser
 
 from dotenv import load_dotenv
 
-from .event_processor import process_url
-from .pdf_reader import fetch_pdf_urls
-from .utils import LOG_FORMAT
+from p_grid_alert.event_processor import process_url
+from p_grid_alert.pdf_reader import fetch_pdf_urls
+from p_grid_alert.utils import LOG_FORMAT, load_config
 
-load_dotenv()
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -28,15 +28,27 @@ def main() -> None:
         datefmt='%Y-%m-%d %H:%M:%S',
     )
 
-    pdf_urls = fetch_pdf_urls()
+    load_dotenv()
+    config = load_config()
+
+    pdf_urls = fetch_pdf_urls(config.target_url, config.target_domain)
     _LOGGER.info(f'Found {len(pdf_urls)} documents.')
 
     if not pdf_urls:
         _LOGGER.warning('No PDFs found for current/next week')
         return
 
+    # One bad PDF must not stop the others from being checked; failures still fail the run.
+    failed = 0
     for url in pdf_urls:
-        process_url(url)
+        try:
+            process_url(url, config.street, config.email)
+        except Exception:
+            _LOGGER.exception(f'Failed to process {url}')
+            failed += 1
+
+    if failed:
+        sys.exit(f'{failed} of {len(pdf_urls)} document(s) failed')
     _LOGGER.info('Check complete')
 
 

@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import logging
 import re
 from datetime import datetime, timedelta
 from urllib.parse import quote
-
-_LOGGER = logging.getLogger()
 
 
 def get_date_range_for_week(weeks_ahead: int = 0) -> tuple[datetime, datetime]:
@@ -24,11 +21,17 @@ def encode(period: tuple[datetime, datetime]) -> str:
 
 def parse_event_date(day_str: str) -> datetime | None:
     """Parse day string to datetime (e.g., 'Marți, 09.12.2025')."""
+    date_match = re.search(r'(\d{2})\.(\d{2})\.(\d{4})', day_str)
+    if not date_match:
+        return None
+    day, month, year = map(int, date_match.groups())
     try:
-        date_match = re.search(r'(\d{2})\.(\d{2})\.(\d{4})', day_str)
-        if date_match:
-            day, month, year = date_match.groups()
-            return datetime(int(year), int(month), int(day))
-    except (ValueError, AttributeError):
-        pass
-    return None
+        return datetime(year, month, day)
+    except ValueError:
+        return None
+
+
+def parse_clock(clock: str) -> timedelta:
+    """Parse 'HH:MM' into an offset from midnight; '24:00' is the end of the day."""
+    hour, minute = map(int, clock.split(':'))
+    return timedelta(hours=hour, minutes=minute)

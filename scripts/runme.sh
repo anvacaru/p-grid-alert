@@ -1,16 +1,18 @@
-# Configuration
+#!/usr/bin/env bash
+set -euo pipefail
+
+# cron starts with a minimal PATH; uv's default install location is ~/.local/bin.
+export PATH="${HOME}/.local/bin:${PATH}"
+
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="${PROJECT_DIR}/logs"
-TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-LOG_FILE="${LOG_DIR}/run_${TIMESTAMP}.log"
+LOG_FILE="${LOG_DIR}/run_$(date +"%Y%m%d_%H%M%S").log"
 
-# Create log directory if it doesn't exist
 mkdir -p "${LOG_DIR}"
+cd "${PROJECT_DIR}"
 
-# Change to project directory
-cd "${PROJECT_DIR}" || exit 1
+status=0
+uv run p-grid-alert --verbose >>"${LOG_FILE}" 2>&1 || status=$?
 
-# Run with verbose logging, redirect output to log file
-uv run p-grid-alert --verbose >> "${LOG_FILE}" 2>&1
-
-echo "Completed at $(date)" >> "${LOG_FILE}"
+echo "Finished at $(date) with exit code ${status}" >>"${LOG_FILE}"
+exit "${status}"

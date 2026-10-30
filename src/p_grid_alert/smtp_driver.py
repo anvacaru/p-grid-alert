@@ -3,42 +3,37 @@ from __future__ import annotations
 import logging
 import smtplib
 from email.mime.text import MIMEText
+from typing import TYPE_CHECKING
 
-from .utils import EMAIL_CONFIG
+if TYPE_CHECKING:
+    from p_grid_alert.event_processor import OutageEvent
+    from p_grid_alert.utils import EmailConfig
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def send_alert(street: str, pdf_url: str, events: list[dict[str, str]]) -> None:
-    """Send email alert for power outage(s)."""
-    try:
-        recipients = [r.strip() for r in EMAIL_CONFIG['email_to'].split(',') if r.strip()]
+def send_alert(street: str, pdf_url: str, events: list[OutageEvent], email: EmailConfig) -> None:
+    """Send one email alert listing all `events`; SMTP errors propagate to the caller."""
+    msg = MIMEText(message_body(street, pdf_url, events))
+    msg['Subject'] = f'Alerta Intrerupere de Curent: {street} - {len(events)} evenimente'
+    msg['From'] = email.smtp_user
+    msg['To'] = ', '.join(email.recipients)
 
-        if not recipients:
-            _LOGGER.warning('No email recipients configured')
-            return
+    with smtplib.SMTP(email.smtp_server, email.smtp_port) as server:
+        server.starttls()
+        server.login(email.smtp_user, email.smtp_pass)
+        server.send_message(msg)
 
-        body = message_body(street, pdf_url, events)
-
-        msg = MIMEText(body)
-        msg['Subject'] = f'Alerta Intrerupere de Curent: {street} - {len(events)} evenimente'
-        msg['From'] = EMAIL_CONFIG['smtp_user']
-        msg['To'] = ', '.join(recipients)
-
-        with smtplib.SMTP(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port']) as server:
-            server.starttls()
-            server.login(EMAIL_CONFIG['smtp_user'], EMAIL_CONFIG['smtp_pass'])
-            server.send_message(msg)
-
-        _LOGGER.info(f'✓ Alert sent to {len(recipients)} recipient(s) with {len(events)} event(s)')
-    except Exception as e:
-        _LOGGER.error(f'Failed to send email: {e}')
+    _LOGGER.info(
+        f'✓ Alert sent to {len(email.recipients)} recipient(s) with {len(events)} event(s)'
+    )
 
 
-def message_body(street: str, pdf_url: str, events: list[dict[str, str]]) -> str:
+def message_body(street: str, pdf_url: str, events: list[OutageEvent]) -> str:
     event_details = '\n\n'.join(
         [
-            f"Eveniment {i+1}:\nZiua: {event['day']}\nPerioada: {event['time']}\n\nContext:\n{event['excerpt']}"
+            f'Eveniment {i+1}:\nZiua: {event.day}\nPerioada: {event.hours or "necunoscuta"}'
+            f'\n\nContext:\n{event.excerpt}'
             for i, event in enumerate(events)
         ]
     )

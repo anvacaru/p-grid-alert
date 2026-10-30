@@ -2,102 +2,119 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import TYPE_CHECKING
-from unittest.mock import patch
 
-from p_grid_alert.event_processor import extract_all_events, is_event_in_future
+from p_grid_alert.event_processor import OutageEvent, extract_all_events, is_event_in_future
 
 if TYPE_CHECKING:
     from typing import Final
 
 import pytest
 
+NOW: Final = datetime(2025, 12, 10, 12, 0)
+
 IS_EVENT_IN_FUTURE_TEST_DATA: Final = [
-    ('future-event', 'Marți, 15.12.2025', '09:00 - 17:00', datetime(2025, 12, 10, 12, 0), True),
-    ('past-event', 'Marți, 09.12.2025', '09:00 - 17:00', datetime(2025, 12, 10, 12, 0), False),
-    ('today-future', 'Marți, 10.12.2025', '18:00 - 20:00', datetime(2025, 12, 10, 12, 0), True),
-    ('today-past', 'Marți, 10.12.2025', '08:00 - 10:00', datetime(2025, 12, 10, 12, 0), False),
-    ('no-time-range', 'Marți, 15.12.2025', 'All day', datetime(2025, 12, 10, 12, 0), True),
-    ('invalid-date', 'Invalid date', '09:00 - 17:00', datetime(2025, 12, 10, 12, 0), True),
+    ('future-event', 'Marți, 15.12.2025', '09:00 - 17:00', True),
+    ('past-event', 'Marți, 09.12.2025', '09:00 - 17:00', False),
+    ('today-future', 'Marți, 10.12.2025', '18:00 - 20:00', True),
+    ('today-past', 'Marți, 10.12.2025', '08:00 - 10:00', False),
+    ('today-ongoing', 'Marți, 10.12.2025', '08:00 - 14:00', True),
+    ('no-time-range-today', 'Marți, 10.12.2025', None, True),
+    ('no-time-range-past', 'Marți, 09.12.2025', None, False),
+    ('invalid-date', '32.13.2025', '09:00 - 17:00', True),
+    ('ends-at-midnight', 'Marți, 10.12.2025', '20:00 - 24:00', True),
+    ('ended-at-midnight', 'Marți, 09.12.2025', '20:00 - 24:00', False),
+    ('overnight-ongoing', 'Marți, 09.12.2025', '22:00 - 14:00', True),
+    ('overnight-past', 'Marți, 09.12.2025', '22:00 - 02:00', False),
 ]
+
+
+@pytest.mark.parametrize(
+    'test_id,day,hours,expected',
+    IS_EVENT_IN_FUTURE_TEST_DATA,
+    ids=[test_id for test_id, *_ in IS_EVENT_IN_FUTURE_TEST_DATA],
+)
+def test_is_event_in_future(test_id: str, day: str, hours: str | None, expected: bool) -> None:
+    # Given
+    event = OutageEvent(day=day, hours=hours, excerpt='')
+
+    # When
+    actual = is_event_in_future(event, NOW)
+
+    # Then
+    assert actual == expected
+
 
 EXTRACT_ALL_EVENTS_TEST_DATA: Final = [
     (
         'single-event',
-        'Some text Marți, 09.12.2025 București, Sector 1 Strada Principala 09:00 - 17:00 more text',
+        'Header text\nMarți, 09.12.2025 București Strada Principala 09:00 - 17:00\n',
         'Principala',
-        1,
-        {'day': 'Marți, 09.12.2025', 'time': '09:00 - 17:00'},
+        [('Marți, 09.12.2025', '09:00 - 17:00')],
     ),
     (
-        'multiple-events',
-        'Marți, 09.12.2025 Strada Principala 09:00 - 12:00 and Miercuri, 10.12.2025 Strada Principala 14:00 - 18:00',
+        'each-row-keeps-its-own-date-and-time',
+        'Marți, 09.12.2025 Strada Principala 09:00 - 12:00\n'
+        'Miercuri, 10.12.2025 Strada Principala 14:00 - 18:00\n',
         'Principala',
-        2,
-        None,
+        [('Marți, 09.12.2025', '09:00 - 12:00'), ('Miercuri, 10.12.2025', '14:00 - 18:00')],
+    ),
+    (
+        'no-bleed-from-neighbour-rows',
+        'Luni, 08.12.2025 Arad Strada Altceva 08:00 - 10:00\n'
+        'Marți, 09.12.2025 Arad Strada Principala\n'
+        'Miercuri, 10.12.2025 Arad Strada Alta 14:00 - 18:00\n',
+        'Principala',
+        [('Marți, 09.12.2025', None)],
+    ),
+    (
+        'street-repeated-in-one-row',
+        'Joi, 11.12.2025 Str Principala nr 1-5, Str Principala nr 9 09:00 - 12:00\n',
+        'Principala',
+        [('Joi, 11.12.2025', '09:00 - 12:00')],
     ),
     (
         'street-not-found',
-        'Some text Marți, 09.12.2025 București, Sector 1 Strada Altceva 09:00 - 17:00',
+        'Marți, 09.12.2025 București Strada Altceva 09:00 - 17:00',
         'Principala',
-        0,
-        None,
+        [],
     ),
     (
-        'no-time',
-        'Some text Marți, 09.12.2025 București, Sector 1 Strada Principala more text',
+        'day-without-diacritics',
+        'Marti, 09.12.2025 Strada Principala 09:00 - 12:00',
         'Principala',
-        1,
-        {'day': 'Marți, 09.12.2025', 'time': 'Unknown'},
+        [('Marti, 09.12.2025', '09:00 - 12:00')],
     ),
     (
-        'no-date',
-        'Some text București, Sector 1 Strada Principala 09:00 - 17:00 more text',
+        'day-with-cedilla',
+        'Marţi, 09.12.2025 Strada Principala 09:00 - 12:00',
         'Principala',
-        1,
-        {'day': 'Unknown', 'time': '09:00 - 17:00'},
+        [('Marţi, 09.12.2025', '09:00 - 12:00')],
+    ),
+    (
+        'street-matches-ignoring-diacritics-and-case',
+        'Marți, 09.12.2025 Strada Dâmboviței 09:00 - 12:00',
+        'dambovitei',
+        [('Marți, 09.12.2025', '09:00 - 12:00')],
+    ),
+    (
+        'street-before-first-date-is-ignored',
+        'Cuprins Principala\nMarți, 09.12.2025 Strada Altceva 09:00 - 17:00',
+        'Principala',
+        [],
     ),
 ]
 
 
 @pytest.mark.parametrize(
-    'test_id,day_str,time_str,mock_now,expected',
-    IS_EVENT_IN_FUTURE_TEST_DATA,
-    ids=[test_id for test_id, *_ in IS_EVENT_IN_FUTURE_TEST_DATA],
-)
-def test_is_event_in_future(
-    test_id: str, day_str: str, time_str: str, mock_now: datetime, expected: bool
-) -> None:
-    # Given
-    with patch('p_grid_alert.event_processor.datetime') as mock_dt:
-        mock_dt.now.return_value = mock_now
-        mock_dt.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
-
-        # When
-        actual = is_event_in_future(day_str, time_str)
-
-        # Then
-        assert actual == expected
-
-
-@pytest.mark.parametrize(
-    'test_id,text,street,expected_count,expected_first',
+    'test_id,text,street,expected',
     EXTRACT_ALL_EVENTS_TEST_DATA,
     ids=[test_id for test_id, *_ in EXTRACT_ALL_EVENTS_TEST_DATA],
 )
 def test_extract_all_events(
-    test_id: str,
-    text: str,
-    street: str,
-    expected_count: int,
-    expected_first: dict[str, str] | None,
+    test_id: str, text: str, street: str, expected: list[tuple[str, str | None]]
 ) -> None:
     # When
     actual = extract_all_events(text, street)
 
     # Then
-    assert len(actual) == expected_count
-
-    if expected_count > 0 and expected_first:
-        assert actual[0]['day'] == expected_first['day']
-        assert actual[0]['time'] == expected_first['time']
-        assert 'excerpt' in actual[0]
+    assert [(event.day, event.hours) for event in actual] == expected

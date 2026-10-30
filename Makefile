@@ -85,4 +85,4 @@ SRC_FILES := $(shell find src -type f -name '*.py')
 
 .PHONY: pyupgrade
 pyupgrade:
-	$(UV_RUN) pyupgrade --py310-plus $(SRC_FILES)
+	$(UV_RUN) pyupgrade --py313-plus $(SRC_FILES)
